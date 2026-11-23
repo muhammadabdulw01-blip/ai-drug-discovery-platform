@@ -2,6 +2,8 @@
 
 An end-to-end, **100% local-first** scientific workbench unifying 5-endpoint ADMET machine learning, AutoDock Vina 3D biophysical docking, de novo retrosynthetic design, Lipid Nanoparticle (LNP) profiling, and live ClinicalTrials.gov analytics.
 
+> **Technical Validation Report:** [Download Full PDF Report (`AI-Drug-Discovery-Technical-Report.pdf`)](./AI-Drug-Discovery-Technical-Report.pdf)
+
 ---
 
 ## 1. Core Scientific Modules
@@ -9,85 +11,33 @@ An end-to-end, **100% local-first** scientific workbench unifying 5-endpoint ADM
 | Module | Underlying Engines & Algorithms | Primary Deliverable |
 | :--- | :--- | :--- |
 | **Molecular Inspector & 3D Physics** | RDKit (2D Descriptors, ETKDGv3 + MMFF94), `py3Dmol` | Lipinski/Veber rules, QED, Synthetic Accessibility (SA), interactive 3D conformers |
-| **5-Endpoint ADMET Predictor** | 2048-bit Morgan Fingerprints + Calibrated Scikit-Learn Models | Aqueous Solubility (ESOL), BBB Penetration, ClinTox, hERG Cardiotoxicity & CYP3A4 Risk |
-| **Target Inspector & 3D Docking** | UniProt REST API, AlphaFold DB (v6), Meeko & AutoDock Vina v1.2.5 | Live 3D protein retrieval, binding free energy (Δ G kcal/mol), \(K_d\) (nM) & ranked poses |
+| **5-Endpoint ADMET Predictor** | 2048-bit Morgan Fingerprints + Calibrated Scikit-Learn Models + Tanimoto AD Gate | Aqueous Solubility (ESOL), BBB Penetration, ClinTox, hERG Cardiotoxicity & CYP3A4 Risk with Applicability Domain alerts |
+| **Target Inspector & 3D Docking** | UniProt REST API, AlphaFold DB (v6), Meeko & AutoDock Vina v1.2.5 | Live 3D protein retrieval, physiological pH 7.4 microspecies enumeration, binding free energy ($\Delta G$, kcal/mol), $K_d$ (nM) & ranked poses |
 | **De Novo Designer & Retrosynthesis** | BRICS Recombination, SELFIES Evolution & Reaction SMARTS | Multi-objective analog generation + wet-lab reaction routes (Amide, Ester, Suzuki, etc.) |
-| **LNP & Ionizable Lipid Profiler** | Custom RDKit SMARTS Linker & Apparent \(pK_a\) Heuristics | Tertiary amine \(pK_a\) window (6.2–6.6) & biodegradable linker audit (ester, silyl, disulfide, acetal) |
+| **LNP & Ionizable Lipid Profiler** | Random Forest $\text{p}K_a$ Regressor (`FCFP4` + RDKit Descriptors) & SMARTS Linker Audit | ML apparent $\text{p}K_a$ prediction (target 6.2–6.6 window), pH 7.4 $\rightarrow$ 5.5 protonation shift & biodegradable linker audit |
 | **Clinical Trial Optimizer & Reports** | ClinicalTrials.gov API v2 & Automated `FPDF2` Engine | Phase split, median enrollment/duration, failure themes & 1-click PDF candidate dossiers |
 
 ---
 
-## 2. Validated End-to-End Benchmarks
+## 2. Peer-Reviewed Cheminformatics & Biophysical Protocols
 
-* **Small-Molecule CNS Case Study (Donepezil + ACHE `P22303`):** Confirmed zero Lipinski violations, high Blood-Brain Barrier penetration, active-site pocket binding (Δ G = -6.04 kcal/mol, RMSD \(1.52\text{ \AA}\)), and synthesized 40 live Alzheimer's trials revealing a median enrollment of **186 patients**, median duration of **29 months**, and **Efficacy/Futility** as the leading termination driver.
-* **Multi-Modality LNP Benchmark (Ionizable Lipid + ApoE `P02649`):** Evaluated 742–918 Da ionizable lipid architecture (cLogP > 13), verified low hERG (`0.013`) and CYP3A4 (`0.117`) liability, mapped Reductive Amination & Esterification synthesis steps, and quantified monomeric ApoE surface affinity (Δ G = -3.98 kcal/mol, \(K_d \approx 1.21\text{ mM}\)).
+To ensure rigorous scientific validity beyond black-box machine learning, this platform implements validated cheminformatics and structural biology workflows derived from peer-reviewed literature by Paul Czodrowski and collaborators:
 
----
+| Literature Reference | Target Module(s) | Implemented Scientific Upgrade |
+| :--- | :--- | :--- |
+| **Czodrowski, *J. Chem. Inf. Model.* (2013)** — *hERG Me Out* | `src/admet_predictor.py`, `src/expanded_admet.py`, `app.py` | Tanimoto Applicability Domain gating, isotonic probability calibration, and multi-endpoint safety profiling |
+| **Baltruschat & Czodrowski, *F1000Research* (2020)** — *Machine learning meets pKa* | `src/lnp_analyzer.py`, `src/admet_predictor.py` | RDKit salt/tautomer canonicalization and Random Forest macroscopic $\text{p}K_a$ regression (`FCFP` + physicochemical descriptors) |
+| **Czodrowski et al., *ChemMedChem* (2025)** — *Protonation Effects in Protein-Ligand Complexes* | `src/vina_docker.py`, `app.py` | Physiological pH 7.4 microspecies enumeration (`+1` cations, `-1` anions, and neutral states) with competitive AutoDock Vina scoring |
 
-## 3. Strict Engineering Principles
-
-* **Zero-Cloud IP Privacy:** All SMILES structures, 3D conformers, and docking simulations execute locally on your hardware with zero external LLM data leakage.
-* **No Mock Scientific Predictions:** Every chemical structure is sanitized with RDKit; all ML models are trained with 5-fold cross-validation on public MoleculeNet / Therapeutics Data Commons datasets.
-* **Live External APIs:** Real-time structural and clinical intelligence retrieved directly via UniProt, AlphaFold DB (v6), and ClinicalTrials.gov API v2.
-
----
-
-## 4. Quick Start Guide
-
-### Step 1: Environment Setup
-```bash
-# Option A: Conda (recommended)
-conda env create -f environment.yml
-conda activate ai-drug-discovery
-
-# Option B: Docker
-docker-compose build
-docker-compose up
-```
-
-### Step 2: Train ADMET Models (Required Once)
-```bash
-python setup_and_train.py
-# or
-make train
-```
-Downloads real datasets (Delaney/ESOL, BBBP, ClinTox, hERG, CYP3A4), computes 2048-bit Morgan fingerprints + RDKit descriptors, trains calibrated models with 5-fold CV, and writes artifacts to `models/`.
-
-### Step 3: Launch Application
-```bash
-streamlit run app.py
-# or
-make run
-```
-Open `http://localhost:8501` in your browser.
-
-### Step 4: Run Tests
-```bash
-pytest tests/ -v
-# Network integration tests (UniProt, AlphaFold, ClinicalTrials.gov):
-pytest tests/ -v -m network
-```
+### Key Scientific Enhancements
+* **Chemical Standardization & Applicability Domain Gating:** Raw SMILES undergo RDKit salt stripping (`LargestFragmentChooser`) and tautomer canonicalization (`TautomerEnumerator`). Every query computes maximum Morgan fingerprint Tanimoto similarity ($T_{\max}$) against the reference training space and flags out-of-domain scaffolds ($T_{\max} < 0.40$).
+* **ML Macroscopic $\text{p}K_a$ & Endosomal Protonation Modeling:** The LNP Profiler predicts apparent $\text{p}K_a$ using a Random Forest regressor trained on 1024-bit Feature Morgan Fingerprints (`FCFP4`, `useFeatures=True`) + 12 RDKit descriptors, paired with Henderson–Hasselbalch ionization profiling at blood pH (`7.4`) vs. endosomal pH (`5.5`).
+* **pH-Aware 3D Molecular Docking:** AutoDock Vina evaluates competing physiological microspecies at pH $7.4 \pm 1.0$ (`+1` cations, `-1` anions, and neutral states) and renders a side-by-side $\Delta G$ (`kcal/mol`) comparison table.
 
 ---
 
-## 5. Project Layout
+## 3. References
 
-```text
-ai-drug-discovery-platform/
-├── app.py                     # Streamlit multi-page scientific workbench
-├── setup_and_train.py         # Dataset download & 5-fold CV model training
-├── environment.yml            # Conda environment specification
-├── Dockerfile / docker-compose.yml
-├── Makefile
-├── src/
-│   ├── chemistry_utils.py     # RDKit descriptors, rules, ETKDGv3 + MMFF94 3D
-│   ├── admet_predictor.py     # 5-endpoint ADMET inference
-│   ├── target_docking.py      # UniProt, AlphaFold DB & AutoDock Vina pipeline
-│   ├── molecule_generator.py  # BRICS/SELFIES design & Reaction SMARTS retrosynthesis
-│   ├── lnp_profiler.py        # Ionizable lipid pKa & biodegradable linker audit
-│   └── clinical_optimizer.py  # ClinicalTrials.gov API v2 & FPDF2 report generator
-├── docs/                      # Executive brief, pitch deck & README PDFs
-├── models/                    # Trained .joblib artifacts + model_metrics.json
-├── data/                      # Auto-populated MoleculeNet datasets
-└── tests/                     # Unit & live API integration tests
-```
+1. Czodrowski, P. *hERG Me Out*. **Journal of Chemical Information and Modeling**, 2013, 53 (9), 2240–2251.
+2. Baltruschat, M.; Czodrowski, P. *Machine learning meets pKa*. **F1000Research**, 2020, 9, 113.
+3. Czodrowski, P. et al. *Protonation Effects in Protein-Ligand Complexes*. **ChemMedChem**, 2025, e202400953.
